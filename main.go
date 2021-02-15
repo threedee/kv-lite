@@ -2,20 +2,17 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
-	"strconv"
 	"sync"
 )
 
 // RWMap uses a lock for map
 type RWMap struct {
 	sync.RWMutex
-	database *json.Encoder
-	m        map[string][]byte
+	m map[string][]byte
 }
 
 // Get locks map and retrieves value from map
@@ -23,8 +20,6 @@ func (r *RWMap) Get(w http.ResponseWriter, key string) {
 	r.RLock()
 	defer r.RUnlock()
 	if value := r.m[key]; len(value) != 0 {
-		w.Header().Set("Content-Type", "application/octet-stream")
-		w.Header().Set("Content-Length", strconv.Itoa(len(value)))
 		w.Write(value)
 	} else {
 		w.WriteHeader(http.StatusNotFound)
@@ -37,7 +32,7 @@ func (r *RWMap) Set(w http.ResponseWriter, key string, value []byte) {
 	defer r.Unlock()
 	r.m[key] = value
 	w.WriteHeader(http.StatusNoContent)
-	r.database.Encode(r.m)
+	r.save()
 }
 
 // Delete key from map with Lock
@@ -46,12 +41,44 @@ func (r *RWMap) Delete(w http.ResponseWriter, key string) {
 	defer r.Unlock()
 	delete(r.m, key)
 	w.WriteHeader(http.StatusNoContent)
-	r.database.Encode(r.m)
+	r.save()
 }
 
-// type KeyValueServer struct {
-// 	store RWMap
-// }
+func (r *RWMap) save() {
+	db, err := os.OpenFile(dbFileName, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
+
+	if err != nil {
+		log.Fatalf("problem opening %s %v", dbFileName, err)
+	}
+	defer db.Close()
+	json.NewEncoder(db).Encode(r.m)
+}
+
+func (r *RWMap) init() {
+	db, err := os.OpenFile(dbFileName, os.O_RDWR|os.O_CREATE, 0666)
+
+	if err != nil {
+		log.Fatalf("problem opening %s %v", dbFileName, err)
+	}
+	defer db.Close()
+
+	var m map[string][]byte
+	info, err := db.Stat()
+
+	if err != nil {
+		log.Fatalf("problem getting file info from file %s, %v", db.Name(), err)
+	}
+
+	if info.Size() != 0 {
+		if err = json.NewDecoder(db).Decode(&m); err != nil {
+			log.Fatalf("problem parsing map, %v", err)
+		}
+	} else {
+		m = make(map[string][]byte)
+	}
+	r.m = m
+
+}
 
 func (r *RWMap) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	key := req.URL.Path[len("/"):]
@@ -59,48 +86,23 @@ func (r *RWMap) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	switch req.Method {
 	case http.MethodPut:
 		defer req.Body.Close()
-		body, _ := ioutil.ReadAll(req.Body)
+		body, err := ioutil.ReadAll(req.Body)
+		if err != nil {
+			log.Fatalf("error reading body, %v", err)
+		}
 		r.Set(w, key, body)
 	case http.MethodGet:
 		r.Get(w, key)
 	case http.MethodDelete:
 		r.Delete(w, key)
 	}
-
-	fmt.Printf("%q", r.m)
-}
-
-type tape struct {
-	file *os.File
-}
-
-func (t *tape) Write(p []byte) (n int, err error) {
-	t.file.Truncate(0)
-	t.file.Seek(0, 0)
-	return t.file.Write(p)
 }
 
 const dbFileName = "key_value.db.json"
 
 func main() {
-	db, err := os.OpenFile(dbFileName, os.O_RDWR|os.O_CREATE, 0666)
-
-	if err != nil {
-		log.Fatalf("problem opening %s %v", dbFileName, err)
-	}
-	defer db.Close()
-	if err = initialiseKeyValueDBFile(db); err != nil {
-		log.Fatalf("problem getting file info from file %s, %v", db.Name(), err)
-	}
-	var m map[string][]byte
-	err = json.NewDecoder(db).Decode(&m)
-	if err != nil {
-		log.Fatalf("problem parsing map, %v", err)
-	}
-	store := &RWMap{
-		database: json.NewEncoder(&tape{db}),
-		m:        m,
-	}
+	store := &RWMap{}
+	store.init()
 
 	mux := http.NewServeMux()
 	mux.Handle("/", store)
@@ -108,20 +110,4 @@ func main() {
 	if err := http.ListenAndServe(":5000", mux); err != nil {
 		log.Fatalf("could not listen on port 5000 %v", err)
 	}
-}
-func initialiseKeyValueDBFile(file *os.File) error {
-	file.Seek(0, 0)
-
-	info, err := file.Stat()
-
-	if err != nil {
-		return fmt.Errorf("problem getting file info from file %s, %v", file.Name(), err)
-	}
-
-	if info.Size() == 0 {
-		file.Write([]byte("{}"))
-		file.Seek(0, 0)
-	}
-
-	return nil
 }
