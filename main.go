@@ -62,7 +62,6 @@ func (r *RWMap) init() {
 	}
 	defer db.Close()
 
-	var m map[string][]byte
 	info, err := db.Stat()
 
 	if err != nil {
@@ -70,14 +69,12 @@ func (r *RWMap) init() {
 	}
 
 	if info.Size() != 0 {
-		if err = json.NewDecoder(db).Decode(&m); err != nil {
+		if err = json.NewDecoder(db).Decode(&r.m); err != nil {
 			log.Fatalf("problem parsing map, %v", err)
 		}
 	} else {
-		m = make(map[string][]byte)
+		r.m = make(map[string][]byte)
 	}
-	r.m = m
-
 }
 
 func (r *RWMap) ServeHTTP(w http.ResponseWriter, req *http.Request) {
