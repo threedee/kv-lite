@@ -19,10 +19,10 @@ type KVStore struct {
 
 // Get locks map and retrieves value from map
 func (k *KVStore) Get(w http.ResponseWriter, key string) {
-	if value := k.m[key]; len(value) != 0 {
-		w.Write(value)
-	} else {
+	if value, ok := k.m[key]; !ok {
 		w.WriteHeader(http.StatusNotFound)
+	} else {
+		w.Write(value)
 	}
 }
 
