@@ -18,19 +18,19 @@ type KVStore struct {
 }
 
 // Get locks map and retrieves value from map
-func (k *KVStore) Get(w http.ResponseWriter, key string) (value []byte, found bool) {
+func (k *KVStore) Get(key string) (value []byte, found bool) {
 	value, found = k.m[key]
 	return
 }
 
 // Set the value for given key with locking map
-func (k *KVStore) Set(w http.ResponseWriter, key string, value []byte) {
+func (k *KVStore) Set(key string, value []byte) {
 	k.m[key] = value
 	k.save()
 }
 
 // Delete key from map with Lock
-func (k *KVStore) Delete(w http.ResponseWriter, key string) {
+func (k *KVStore) Delete(key string) {
 	delete(k.m, key)
 	k.save()
 }

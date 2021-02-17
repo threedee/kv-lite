@@ -16,18 +16,18 @@ func (k *KVStore) handler(w http.ResponseWriter, req *http.Request) {
 		if err != nil {
 			log.Fatalf("error reading body, %v", err)
 		}
-		k.Set(w, key, value)
+		k.Set(key, value)
 
 		w.WriteHeader(http.StatusNoContent)
 	case http.MethodGet:
-		value, found := k.Get(w, key)
+		value, found := k.Get(key)
 		if found {
 			w.Write(value)
 		} else {
 			w.WriteHeader(http.StatusNotFound)
 		}
 	case http.MethodDelete:
-		k.Delete(w, key)
+		k.Delete(key)
 		w.WriteHeader(http.StatusNoContent)
 	}
 }
