@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"log"
 	"net/http"
 )
@@ -18,7 +17,7 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", server.handler)
 
-	if err := http.ListenAndServe(fmt.Sprintf(":%d", *port), mux); err != nil {
-		log.Fatalf("could not listen on port 5000 %v", err)
+	if err := http.ListenAndServe(":"+string(*port), mux); err != nil {
+		log.Fatalf("could not listen on port %d,  %v", *port, err)
 	}
 }
