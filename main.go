@@ -18,6 +18,6 @@ func main() {
 	mux.HandleFunc("/", server.handler)
 
 	if err := http.ListenAndServe(":"+string(*port), mux); err != nil {
-		log.Fatalf("could not listen on port %d,  %v", err)
+		log.Fatalf("could not listen on port %d,  %v", *port, err)
 	}
 }
